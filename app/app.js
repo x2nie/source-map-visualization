@@ -2,24 +2,8 @@ import { Component, mount, onMounted, onWillUnmount, useRef, useState, xml } fro
 import * as SourceMap from "source-map";
 
 import "./app.less";
-import UglifyJS from "./uglify-js";
+// import UglifyJS from "./uglify-js";
 import generateHtml from "./generateHtml";
-
-import coffeeJs from "../example/coffee/example.js?raw";
-import coffeeMapText from "../example/coffee/example.map?raw";
-import coffeeOriginal from "../example/coffee/example?raw";
-import simpleCoffeeJs from "../example/simple-coffee/example.js?raw";
-import simpleCoffeeMapText from "../example/simple-coffee/example.map?raw";
-import simpleCoffeeOriginal from "../example/simple-coffee/example?raw";
-import typescriptJs from "../example/typescript/example.js?raw";
-import typescriptMapText from "../example/typescript/example.map?raw";
-import typescriptOriginal from "../example/typescript/example?raw";
-import babelJs from "../example/babel/example.js?raw";
-import babelMapText from "../example/babel/example.map?raw";
-import babelOriginal from "../example/babel/example?raw";
-import sassJs from "../example/sass/example.js?raw";
-import sassMapText from "../example/sass/example.map?raw";
-import sassOriginal from "../example/sass/example?raw";
 
 const exampleKinds = ["coffee", "simple-coffee", "typescript", "babel", "sass"];
 const SOURCE_MAPPING_URL_REG_EXP = /\/\/[@#]\s*sourceMappingURL\s*=\s*data:[^\n]*?base64,([^\n]*)/;
@@ -27,31 +11,33 @@ const SOURCE_MAPPING_URL_REG_EXP2 = /\/\*\s*[@#]\s*sourceMappingURL\s*=\s*data:[
 
 const examples = {
 	coffee: {
-		js: coffeeJs,
-		map: JSON.parse(coffeeMapText),
-		original: coffeeOriginal,
+		jsUrl: new URL("../example/coffee/example.js", import.meta.url).href,
+		mapUrl: new URL("../example/coffee/example.map", import.meta.url).href,
+		originalUrl: new URL("../example/coffee/example", import.meta.url).href,
 	},
 	"simple-coffee": {
-		js: simpleCoffeeJs,
-		map: JSON.parse(simpleCoffeeMapText),
-		original: simpleCoffeeOriginal,
+		jsUrl: new URL("../example/simple-coffee/example.js", import.meta.url).href,
+		mapUrl: new URL("../example/simple-coffee/example.map", import.meta.url).href,
+		originalUrl: new URL("../example/simple-coffee/example", import.meta.url).href,
 	},
 	typescript: {
-		js: typescriptJs,
-		map: JSON.parse(typescriptMapText),
-		original: typescriptOriginal,
+		jsUrl: new URL("../example/typescript/example.js", import.meta.url).href,
+		mapUrl: new URL("../example/typescript/example.map", import.meta.url).href,
+		originalUrl: new URL("../example/typescript/example", import.meta.url).href,
 	},
 	babel: {
-		js: babelJs,
-		map: JSON.parse(babelMapText),
-		original: babelOriginal,
+		jsUrl: new URL("../example/babel/example.js", import.meta.url).href,
+		mapUrl: new URL("../example/babel/example.map", import.meta.url).href,
+		originalUrl: new URL("../example/babel/example", import.meta.url).href,
 	},
 	sass: {
-		js: sassJs,
-		map: JSON.parse(sassMapText),
-		original: sassOriginal,
+		jsUrl: new URL("../example/sass/example.js", import.meta.url).href,
+		mapUrl: new URL("../example/sass/example.map", import.meta.url).href,
+		originalUrl: new URL("../example/sass/example", import.meta.url).href,
 	},
 };
+
+const exampleCache = {};
 
 const { SourceMapConsumer, SourceMapGenerator } = SourceMap;
 
@@ -155,6 +141,42 @@ function getExample(kind) {
 	return examples[kind] || examples.typescript;
 }
 
+function fetchText(url) {
+	return fetch(url).then((response) => {
+		if (!response.ok) {
+			throw new Error(`Failed to load ${url}`);
+		}
+		return response.text();
+	});
+}
+
+function fetchExample(kind) {
+	if (!exampleCache[kind]) {
+		const example = getExample(kind);
+		exampleCache[kind] = Promise.all([fetchText(example.jsUrl), fetchText(example.mapUrl)])
+			.then(([generatedSource, mapText]) => {
+				const sourceMap = JSON.parse(mapText);
+				if (sourceMap.sourcesContent) {
+					return {
+						js: generatedSource,
+						map: sourceMap,
+						original: null,
+					};
+				}
+				return fetchText(example.originalUrl).then((originalSource) => ({
+					js: generatedSource,
+					map: sourceMap,
+					original: originalSource,
+				}));
+			})
+			.catch((err) => {
+				delete exampleCache[kind];
+				throw err;
+			});
+	}
+	return exampleCache[kind];
+}
+
 class CodeBlock extends Component {
 	getSegmentClass(segment) {
 		let className = segment.className || "";
@@ -213,6 +235,7 @@ class App extends Component {
 		this.state = useState(createInitialState());
 		this.oldHash = "";
 		this.pendingCustomFile = null;
+		this.exampleRequestId = 0;
 
 		this.handleHashChange = this.handleHashChange.bind(this);
 		this.handleWindowDrag = this.handleWindowDrag.bind(this);
@@ -292,19 +315,33 @@ class App extends Component {
 		}
 
 		if (exampleKinds.indexOf(exampleKind) < 0) exampleKind = "typescript";
-		this.loadNamedExample(exampleKind);
+		this.state.currentHash = exampleKind;
+		this.state.pageError = "";
+		void this.loadNamedExample(exampleKind);
 		this.state.customLink = "";
 		this.oldHash = exampleKind;
 	}
 
 	loadNamedExample(exampleKind) {
-		const example = getExample(exampleKind);
-		const exampleMap = cloneMap(example.map);
-		const sources = exampleMap.sourcesContent ? exampleMap.sourcesContent.slice() : [example.original];
-		this.loadExample(sources, example.js, exampleMap, {
-			hash: exampleKind,
-			customLink: "",
-		});
+		const requestId = ++this.exampleRequestId;
+		return fetchExample(exampleKind)
+			.then((example) => {
+				if (requestId !== this.exampleRequestId) {
+					return;
+				}
+				const exampleMap = cloneMap(example.map);
+				const sources = exampleMap.sourcesContent ? exampleMap.sourcesContent.slice() : [example.original];
+				this.loadExample(sources, example.js, exampleMap, {
+					hash: exampleKind,
+					customLink: "",
+				});
+			})
+			.catch((err) => {
+				if (requestId !== this.exampleRequestId) {
+					return;
+				}
+				this.state.pageError = err.message;
+			});
 	}
 
 	loadExample(sources, generatedSource, sourceMap, options) {
