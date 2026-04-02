@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "file": "example.js",
+  "sourceRoot": "",
+  "sources": [
+    "example"
+  ],
+  "names": [],
+  "mappings": ";AAAA,IAAA;;AAAA,MAAA,GAAS,SAAC,CAAD;SAAO,CAAA,GAAI;AAAX;;AACT,IAAA,GAAS,SAAC,CAAD;SAAO,MAAA,CAAO,CAAP,CAAA,GAAY;AAAnB;;AAET,KAAA,CAAM,IAAA,CAAK,CAAL,CAAN"
+}
