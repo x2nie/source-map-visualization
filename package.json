@@ -5,8 +5,9 @@
   "main": "app/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack-dev-server --inline --hot",
-    "build": "webpack --progress --profile",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
     "deploy": "gh-pages -d build"
   },
   "repository": "",
@@ -14,22 +15,13 @@
   "license": "MIT",
   "devDependencies": {
     "gh-pages": "^0.8.0",
-    "html-webpack-plugin": "^2.7.2",
-    "webpack": "^1.12.12",
-    "webpack-dev-server": "^1.14.1"
+    "vite": "^6.0.2"
   },
   "dependencies": {
     "@odoo/owl": "^2.8.2",
-    "css-loader": "^0.23.1",
-    "escape-html": "^1.0.3",
-    "file-loader": "^0.8.5",
-    "json-loader": "^0.5.0",
     "less": "^2.5.3",
-    "less-loader": "^2.2.2",
-    "raw-loader": "~0.5.0",
     "source-map": "^0.5.3",
-    "style-loader": "^0.13.0",
-    "uglify-js": "^2.6.1",
-    "url-loader": "^0.5.1"
-  }
+    "uglify-js": "^2.6.1"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
