@@ -200,18 +200,15 @@ loadOwlRuntime().then(function(owl) {
 						<h4 class="source-header"><t t-esc="row.text"/></h4>
 					</t>
 					<t t-else="">
-						<t t-foreach="row.segments" t-as="segment" t-key="segment.key">
-							<t t-if="segment.className || segment.mappingKey">
-								<span
+						<t t-foreach="row.segments" t-as="segment" t-key="segment.key"
+							><span t-if="segment.className || segment.mappingKey"
 									t-att-class="getSegmentClass(segment)"
 									t-att-title="segment.title || undefined"
 									t-att-data-mapping-key="segment.mappingKey || undefined"
 									t-on-mouseenter="onSegmentHover"
 									t-on-click="onSegmentClick"
-								><t t-esc="segment.text"/></span>
-							</t>
-							<t t-else=""><t t-esc="segment.text"/></t>
-						</t>
+								><t t-esc="segment.text"/></span><t t-else="" t-esc="segment.text" 
+						/></t>
 					</t>
 				</td>
 			</tr>
