@@ -1,6 +1,6 @@
 import { loadFile, mount } from "@odoo/owl";
 
-import "./app.less";
+import "./app.scss";
 import App from "./app";
 
 async function bootstrap() {

@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@odoo/owl": "^2.8.2",
-    "less": "^2.5.3",
+    "sass": "^1.77.8",
     "source-map": "^0.5.3",
     "uglify-js": "^2.6.1"
   },

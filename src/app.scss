@@ -13,7 +13,7 @@
 	--danger: #b42318;
 }
 
-.scrollbar-style {
+@mixin scrollbar-style {
 	&::-webkit-scrollbar {
 		width: 10px;
 		height: 10px;
@@ -29,22 +29,22 @@
 	}
 }
 
-.flex-container {
+@mixin flex-container {
 	display: flex;
 	overflow: hidden;
 
 	> * {
 		flex: 0 0 auto;
 		overflow: auto;
-		.scrollbar-style;
+		@include scrollbar-style;
 	}
 }
 
-.stretchy {
+@mixin stretchy {
 	flex: 1 1 auto;
 }
 
-.column {
+@mixin column {
 	flex-direction: column;
 }
 
@@ -69,8 +69,8 @@ a {
 }
 
 .app-shell {
-	.flex-container;
-	.column;
+	@include flex-container;
+	@include column;
 }
 
 .app-header {
@@ -167,13 +167,13 @@ a {
 }
 
 main {
-	.flex-container;
-	.stretchy;
+	@include flex-container;
+	@include stretchy;
 	padding: 14px;
 	gap: 10px;
 
 	> .codeblock {
-		.stretchy;
+		@include stretchy;
 		min-width: 0;
 	}
 }
