@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Mini Source Map AST Viewer</title>
+<style>
+  body { font-family: monospace; display: flex; gap: 20px; }
+  .panel {
+    width: 45%;
+    border: 1px solid #ccc;
+    padding: 10px;
+    overflow: auto;
+    height: 90vh;
+    white-space: pre;
+  }
+  .token {
+    cursor: pointer;
+    background: rgba(159, 124, 240, 0.342);
+  }
+  .active {
+    background: black;
+    color: white;
+  }
+</style>
+</head>
+<body>
+
+<div id="left" class="panel"></div>
+<div id="right" class="panel"></div>
+
+<script>
+// =============================
+// 1. SCANNER (tokenizer sederhana)
+// =============================
+function scan(text) {
+  let tokens = [];
+  let line = 1, col = 1, offset = 0;
+
+  const isWord = c => /[a-zA-Z0-9_]/.test(c);
+
+  while (offset < text.length) {
+    let c = text[offset];
+
+    if (c === "\n") {
+      line++; col = 1; offset++;
+      continue;
+    }
+
+    if (/\s/.test(c)) {
+      col++; offset++;
+      continue;
+    }
+
+    // word
+    if (isWord(c)) {
+      let start = offset;
+      let startCol = col;
+
+      let word = "";
+      while (offset < text.length && isWord(text[offset])) {
+        word += text[offset];
+        offset++; col++;
+      }
+
+      tokens.push({
+        type: "word",
+        text: word,
+        line,
+        col: startCol,
+        start,
+        end: offset
+      });
+      continue;
+    }
+
+    // symbol
+    tokens.push({
+      type: "symbol",
+      text: c,
+      line,
+      col,
+      start: offset,
+      end: offset + 1
+    });
+
+    offset++; col++;
+  }
+
+  return tokens;
+}
+
+// =============================
+// 2. GENERATE JSON STRING
+// =============================
+function buildJSON(tokens) {
+  let json = "";
+  let map = [];
+  let pos = 0;
+
+  function write(str, token = null) {
+    let start = pos;
+    json += str;
+    pos += str.length;
+
+    if (token) {
+      map.push({
+        srcStart: token.start,
+        srcEnd: token.end,
+        genStart: start,
+        genEnd: pos
+      });
+    }
+  }
+
+  write("[\n");
+
+  tokens.forEach((t, i) => {
+    write("  {\n");
+
+    write('    "t": ');
+    write(`"${t.text}"`, t);   // 🔥 mapping di sini
+
+    write(",\n");
+
+    write('    "l": ');
+    write(String(t.line));
+
+    write(",\n");
+
+    write('    "c": ');
+    write(String(t.col));
+
+    write("\n  }");
+
+    if (i < tokens.length - 1) write(",\n");
+  });
+
+  write("\n]");
+
+  return { json, map };
+}
+
+// =============================
+// 3. BUILD SOURCE MAP (offset ↔ offset)
+// =============================
+function buildMap(srcTokens, jsonText) {
+  let map = [];
+
+  // naive: cocokkan berdasarkan urutan token
+  let j = 0;
+
+  for (let i = 0; i < srcTokens.length; i++) {
+    let t = srcTokens[i];
+
+    let idx = jsonText.indexOf(t.text, j);
+    if (idx !== -1) {
+      map.push({
+        srcStart: t.start,
+        srcEnd: t.end,
+        genStart: idx,
+        genEnd: idx + t.text.length
+      });
+      j = idx + t.text.length;
+    }
+  }
+
+  return map;
+}
+
+// =============================
+// 4. RENDER WITH SPANS
+// =============================
+function renderWithMap(container, text, side, map) {
+  container.innerHTML = "";
+
+  let pos = 0;
+
+  function findMapping(i) {
+    return map.find(m =>
+      side === "src"
+        ? i >= m.srcStart && i < m.srcEnd
+        : i >= m.genStart && i < m.genEnd
+    );
+  }
+
+  while (pos < text.length) {
+    let m = findMapping(pos);
+
+    if (m) {
+      let start = side === "src" ? m.srcStart : m.genStart;
+      let end   = side === "src" ? m.srcEnd   : m.genEnd;
+
+      let span = document.createElement("span");
+      span.className = "token";
+      span.textContent = text.slice(start, end);
+      span.dataset.id = map.indexOf(m);
+
+      container.appendChild(span);
+      pos = end;
+    } else {
+      container.appendChild(document.createTextNode(text[pos]));
+      pos++;
+    }
+  }
+}
+
+// =============================
+// 5. INTERACTION (highlight)
+// =============================
+function bindInteraction(left, right) {
+  function clear() {
+    document.querySelectorAll(".token").forEach(e => {
+      e.classList.remove("active");
+    });
+  }
+
+  document.querySelectorAll(".token").forEach(el => {
+    el.onclick = () => {
+      clear();
+      let id = el.dataset.id;
+
+      document.querySelectorAll(`.token[data-id="${id}"]`)
+        .forEach(e => e.classList.add("active"));
+    };
+  });
+}
+
+// =============================
+// MAIN
+// =============================
+const source = `
+begin
+  x := 10
+  y := x + 5
+end
+`;
+
+const tokens = scan(source);        // 👉 Lexing / scanning phase
+const {json,map} = buildJSON(tokens);     // 👉 Transform / generate phase
+// const map = buildMap(tokens, json); // 👉 Source map builder (inti sihirnya 🔥)
+
+console.log('tokens:',tokens)
+console.log('map:',map)
+// console.log('json:',json)
+
+const left = document.getElementById("left");
+const right = document.getElementById("right");
+
+renderWithMap(left, source, "src", map);
+renderWithMap(right, json, "gen", map);
+
+bindInteraction(left, right);
+
+</script>
+</body>
+</html>
