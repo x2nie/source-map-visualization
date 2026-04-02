@@ -1,58 +1,95 @@
 var SourceMap = require("source-map");
-var escapeHTML = require("escape-html");
+
 var LINESTYLES = 5;
 var MAX_LINES = 5000;
 
-function sanitize(text) {
-	// Escape any <>'"\ during HTML serialization
-	// https://www.owasp.org/index.php/XSS_%28Cross_Site_Scripting%29_Prevention_Cheat_Sheet#RULE_.231_-_HTML_Escape_Before_Inserting_Untrusted_Data_into_HTML_Element_Content
-	return escapeHTML(text);
+function createSparseRows() {
+	return [];
+}
+
+function ensureContentRow(rows, rowNumber) {
+	if(!rows[rowNumber]) {
+		rows[rowNumber] = {
+			key: "row-" + rowNumber,
+			kind: "segments",
+			segments: []
+		};
+	}
+	return rows[rowNumber];
+}
+
+function pushText(rows, rowNumber, text) {
+	var row = ensureContentRow(rows, rowNumber);
+	if(typeof text === "undefined" || text === null) return;
+	if(text === "") return;
+	row.segments.push({
+		key: "text-" + rowNumber + "-" + row.segments.length,
+		text: text,
+		className: "",
+		title: "",
+		mappingKey: ""
+	});
+}
+
+function pushSegment(rows, rowNumber, text, options) {
+	var row = ensureContentRow(rows, rowNumber);
+	if(typeof text === "undefined" || text === null || text === "") return;
+	var className = options.generated ? "generated-item" : options.mapping ? "mapping-item" : "original-item";
+	className += " style-" + (options.line % LINESTYLES);
+	row.segments.push({
+		key: "segment-" + rowNumber + "-" + row.segments.length,
+		text: text,
+		className: className,
+		title: options.name || "",
+		mappingKey: typeof options.source !== "undefined" ? options.source + ":" + options.line + ":" + options.column : "",
+		source: options.source,
+		line: options.line,
+		column: options.column
+	});
+}
+
+function pushSourceHeader(rows, rowNumber, source) {
+	rows[rowNumber] = {
+		key: "source-" + rowNumber + "-" + source,
+		kind: "sourceHeader",
+		text: source
+	};
+}
+
+function toDenseRows(rows) {
+	var denseRows = [];
+	var length = Math.max(rows.length, 1);
+	for(var i = 1; i < length; i++) {
+		denseRows.push(rows[i] || {
+			key: "row-" + i,
+			kind: "segments",
+			segments: []
+		});
+	}
+	if(denseRows.length === 0) {
+		denseRows.push({
+			key: "row-empty",
+			kind: "segments",
+			segments: []
+		});
+	}
+	return denseRows;
 }
 
 module.exports = function(map, generatedCode, sources) {
-	var generatedSide = [];
-	var originalSide = [];
-	var mappingsSide = [];
-
-	function addTo(side, line, html) {
-		side[line] = (side[line] || "") + html;
-	}
-
-	function span(text, options) {
-		var attrs = {};
-		if(options) {
-			if(options.generated) {
-				attrs["class"] = "generated-item";
-			} else if(options.mapping) {
-				attrs["class"] = "mapping-item";
-			} else {
-				attrs["class"] = "original-item";
-			}
-			if(typeof options.source !== "undefined") {
-				attrs["class"] += " item-" + options.source + "-" + options.line + "-" + options.column;
-			}
-			attrs["class"] += " style-" + (options.line%LINESTYLES);
-			attrs["title"] = options.name;
-			attrs["data-source"] = options.source;
-			attrs["data-line"] = options.line;
-			attrs["data-column"] = options.column;
-		}
-		return "<span " + Object.keys(attrs).filter(function(key) {
-			return typeof attrs[key] !== "undefined";
-		}).map(function(key) {
-			return key + "=\"" + attrs[key] + "\"";
-		}).join(" ") + ">" + sanitize(text) + "</span>";
-	}
+	var generatedSide = createSparseRows();
+	var originalSide = createSparseRows();
+	var mappingsSide = createSparseRows();
 
 	var mapSources = map.sources;
 
 	var generatedLine = 1;
 	var nodes = SourceMap.SourceNode.fromStringWithSourceMap(generatedCode, map).children;
-	nodes.forEach(function(item, idx) {
+	nodes.forEach(function(item) {
 		if(generatedLine > MAX_LINES) return;
 		if(typeof item === "string") {
 			item.split("\n").forEach(function(line) {
-				addTo(generatedSide, generatedLine, sanitize(line));
+				pushText(generatedSide, generatedLine, line);
 				generatedLine++;
 			});
 			generatedLine--;
@@ -60,19 +97,18 @@ module.exports = function(map, generatedCode, sources) {
 			var str = item.toString();
 			var source = mapSources.indexOf(item.source);
 			str.split("\n").forEach(function(line) {
-				addTo(generatedSide, generatedLine, span(line, {
+				pushSegment(generatedSide, generatedLine, line, {
 					generated: true,
 					source: source,
 					line: item.line,
 					column: item.column,
 					name: item.name
-				}));
-				generatedLine++
+				});
+				generatedLine++;
 			});
 			generatedLine--;
 		}
 	});
-
 
 	var lastGenLine = 1;
 	var lastOrgSource = "";
@@ -82,41 +118,50 @@ module.exports = function(map, generatedCode, sources) {
 		while(lastGenLine < mapping.generatedLine) {
 			mappingsLine++;
 			lastGenLine++;
-			addTo(mappingsSide, mappingsLine, sanitize(lastGenLine + ": "));
+			pushText(mappingsSide, mappingsLine, lastGenLine + ": ");
 		}
 		if(typeof mapping.originalLine == "number") {
 			if(lastOrgSource !== mapping.source && mapSources.length > 1) {
-				addTo(mappingsSide, mappingsLine, "[" + mapping.source + "] ");
+				pushText(mappingsSide, mappingsLine, "[" + mapping.source + "] ");
 				lastOrgSource = mapping.source;
 			}
 			var source = mapSources.indexOf(mapping.source);
-			addTo(mappingsSide, mappingsLine, span(mapping.generatedColumn + "->" + mapping.originalLine + ":" + mapping.originalColumn, {
+			pushSegment(mappingsSide, mappingsLine, mapping.generatedColumn + "->" + mapping.originalLine + ":" + mapping.originalColumn, {
 				mapping: true,
 				source: source,
 				line: mapping.originalLine,
 				column: mapping.originalColumn
-			}));
+			});
 		} else {
-			addTo(mappingsSide, mappingsLine, span(mapping.generatedColumn, {
-				mapping: true
-			}));
+			pushSegment(mappingsSide, mappingsLine, String(mapping.generatedColumn), {
+				mapping: true,
+				line: mappingsLine,
+				column: mapping.generatedColumn
+			});
 		}
-		addTo(mappingsSide, mappingsLine, "  ");
+		pushText(mappingsSide, mappingsLine, "  ");
 	});
 
-
 	var originalLine = 1;
-	var line = 1, column = 0, currentOutputLine = 1, targetOutputLine = -1, limited = false;
+	var line = 1;
+	var column = 0;
+	var currentOutputLine = 1;
+	var targetOutputLine = -1;
+	var limited = false;
 	var lastMapping = null;
 	var currentSource = null;
 	var exampleLines;
 	var mappingsBySource = {};
 	map.eachMapping(function(mapping) {
 		if(typeof mapping.originalLine !== "number") return;
-		if(mapping.generatedLine > MAX_LINES) return limited = true;
+		if(mapping.generatedLine > MAX_LINES) {
+			limited = true;
+			return;
+		}
 		if(!mappingsBySource[mapping.source]) mappingsBySource[mapping.source] = [];
 		mappingsBySource[mapping.source].push(mapping);
 	}, undefined, SourceMap.SourceMapConsumer.ORIGINAL_ORDER);
+
 	Object.keys(mappingsBySource).map(function(source) {
 		return [source, mappingsBySource[source][0].generatedLine];
 	}).sort(function(a, b) {
@@ -137,14 +182,15 @@ module.exports = function(map, generatedCode, sources) {
 		}
 		var startLine = mappings.map(function(mapping) {
 			return mapping.generatedLine - mapping.originalLine + 1;
-		}).sort(function(a, b) { return a - b });
-		startLine = startLine[0];
+		}).sort(function(a, b) {
+			return a - b;
+		})[0];
 		while(currentOutputLine < startLine) {
 			originalLine++;
 			currentOutputLine++;
 		}
 		if(mapSources.length > 1) {
-			addTo(originalSide, originalLine, "<h4 class='alert alert-info'>" + sanitize(source) + "</h4>");
+			pushSourceHeader(originalSide, originalLine, source);
 			originalLine++;
 		}
 		var exampleSource = sources[mapSources.indexOf(source)];
@@ -153,113 +199,112 @@ module.exports = function(map, generatedCode, sources) {
 		currentSource = source;
 		mappings.forEach(function(mapping, idx) {
 			if(lastMapping) {
-				var source = mapSources.indexOf(lastMapping.source);
+				var previousSource = mapSources.indexOf(lastMapping.source);
 				if(line < mapping.originalLine) {
-					addTo(originalSide, originalLine, span(exampleLines.shift(), {
+					pushSegment(originalSide, originalLine, exampleLines.shift(), {
 						original: true,
-						source: source,
+						source: previousSource,
 						line: lastMapping.originalLine,
 						column: lastMapping.originalColumn
-					}));
+					});
 					originalLine++;
-					line++; column = 0;
+					line++;
+					column = 0;
 					currentOutputLine++;
 					while(line < mapping.originalLine) {
-						addTo(originalSide, originalLine, sanitize(exampleLines.shift()));
+						pushText(originalSide, originalLine, exampleLines.shift());
 						originalLine++;
-						line++; column = 0;
+						line++;
+						column = 0;
 						currentOutputLine++;
 					}
 					startLine = [];
 					for(var i = idx; i < mappings.length && mappings[i].originalLine <= mapping.originalLine + 1; i++) {
 						startLine.push(mappings[i].generatedLine - mappings[i].originalLine + mapping.originalLine);
 					}
-					startLine.sort(function(a, b) { return a - b });
+					startLine.sort(function(a, b) {
+						return a - b;
+					});
 					startLine = startLine[0];
 					while(typeof startLine !== "undefined" && currentOutputLine < startLine) {
-						// addTo(originalSide, originalLine, "~");
 						originalLine++;
 						currentOutputLine++;
 					}
 					if(column < mapping.originalColumn) {
-						addTo(originalSide, originalLine, sanitize(shiftColumns(mapping.originalColumn - column)));
+						pushText(originalSide, originalLine, shiftColumns(mapping.originalColumn - column));
 					}
 				}
 				if(mapping.originalColumn > column) {
-					addTo(originalSide, originalLine, span(shiftColumns(mapping.originalColumn - column), {
+					pushSegment(originalSide, originalLine, shiftColumns(mapping.originalColumn - column), {
 						original: true,
-						source: source,
+						source: previousSource,
 						line: lastMapping.originalLine,
 						column: lastMapping.originalColumn
-					}));
+					});
 				}
 			} else {
 				while(line < mapping.originalLine) {
-					addTo(originalSide, originalLine, sanitize(exampleLines.shift()));
+					pushText(originalSide, originalLine, exampleLines.shift());
 					originalLine++;
-					line++; column = 0;
+					line++;
+					column = 0;
 				}
 				if(column < mapping.originalColumn) {
-					addTo(originalSide, originalLine, sanitize(shiftColumns(mapping.originalColumn - column)));
+					pushText(originalSide, originalLine, shiftColumns(mapping.originalColumn - column));
 				}
 			}
 			lastMapping = mapping;
 		});
 	});
+
 	function endFile() {
 		if(lastMapping) {
 			var source = mapSources.indexOf(lastMapping.source);
-			addTo(originalSide, originalLine, span(exampleLines.shift(), {
+			pushSegment(originalSide, originalLine, exampleLines.shift(), {
 				original: true,
 				source: source,
 				line: lastMapping.originalLine,
 				column: lastMapping.originalColumn
-			}));
+			});
 		}
 		if(!limited) {
-			exampleLines.forEach(function(line) {
+			exampleLines.forEach(function(exampleLine) {
 				originalLine++;
 				currentOutputLine++;
-				addTo(originalSide, originalLine, sanitize(line));
+				pushText(originalSide, originalLine, exampleLine);
 			});
 		}
 	}
+
 	endFile();
 
 	function shiftColumns(count) {
-        var nextLine = exampleLines[0] || '';
+		var nextLine = exampleLines[0] || "";
 		exampleLines[0] = nextLine.substr(count);
 		column += count;
 		return nextLine.substr(0, count);
 	}
 
-	var length = Math.max(originalSide.length, generatedSide.length, mappingsSide.length);
-
-	var tableRows = [];
-
-	for (var i = 0; i < length; i++) {
-		tableRows[i] = [
-			originalSide[i] || "",
-			generatedSide[i] || "",
-			mappingsSide[i] || ""
-		].map(function(cell) {
-			return "<td>" + cell + "</td>";
-		});
-	}
-
-    var originalSideElem = "<div class='origside codeblock'><h3>original</h3><pre><code><table><tbody>";
-    var generatedSideElem = "<div class='genside codeblock'><h3>generated</h3><pre><code><table><tbody>";
-    var mappingsSideElem = "<div class='genside codeblock'><h3>mappings</h3><pre><code><table><tbody>";
-
-    tableRows.forEach(function (row) {
-        originalSideElem += "<tr>" + row[0] + "</tr>",
-        generatedSideElem += "<tr>" + row[1] + "</tr>",
-        mappingsSideElem += "<tr>" + row[2] + "</tr>"
-    });
-
-    return {
-        files: generatedSideElem + "</tbody></table></code></pre></div>" +
-               originalSideElem + "</tbody></table></code></pre></div>",
-        mappings: mappingsSideElem + "</tbody></table></code></pre></div>"
-    };
-}
+	return {
+		files: [
+			{
+				key: "generated",
+				title: "generated",
+				className: "genside codeblock",
+				rows: toDenseRows(generatedSide)
+			},
+			{
+				key: "original",
+				title: "original",
+				className: "origside codeblock",
+				rows: toDenseRows(originalSide)
+			}
+		],
+		mappings: {
+			key: "mappings",
+			title: "mappings",
+			className: "genside codeblock",
+			rows: toDenseRows(mappingsSide)
+		}
+	};
+};

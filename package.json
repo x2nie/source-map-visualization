@@ -6,7 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "webpack-dev-server --inline --hot",
-    "build": "webpack -p --progress --profile",
+    "build": "webpack --progress --profile",
     "deploy": "gh-pages -d build"
   },
   "repository": "",
@@ -19,6 +19,7 @@
     "webpack-dev-server": "^1.14.1"
   },
   "dependencies": {
+    "@odoo/owl": "^2.8.2",
     "css-loader": "^0.23.1",
     "escape-html": "^1.0.3",
     "file-loader": "^0.8.5",

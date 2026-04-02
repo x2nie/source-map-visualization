@@ -1,4 +1,3 @@
-var webpack = require("webpack");
 var path = require("path");
 var HtmlPlugin = require("html-webpack-plugin");
 
@@ -18,17 +17,10 @@ module.exports = {
 		]
 	},
 	plugins: [
-		new webpack.ProvidePlugin({
-			$: "jquery",
-			jQuery: "jquery"
-		}),
 		new HtmlPlugin({
 			title: "source-map-visualization"
 		})
 	],
-	amd: {
-		jQuery: true
-	},
 	cache: true,
 	devtool: "source-map"
 };
