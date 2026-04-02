@@ -11,29 +11,29 @@ const SOURCE_MAPPING_URL_REG_EXP2 = /\/\*\s*[@#]\s*sourceMappingURL\s*=\s*data:[
 
 const examples = {
 	coffee: {
-		jsUrl: new URL("../example/coffee/example.js", import.meta.url).href,
-		mapUrl: new URL("../example/coffee/example.map", import.meta.url).href,
-		originalUrl: new URL("../example/coffee/example", import.meta.url).href,
+		jsUrl: "/example/coffee/example.js",
+		mapUrl: "/example/coffee/example.map",
+		originalUrl: "/example/coffee/example",
 	},
 	"simple-coffee": {
-		jsUrl: new URL("../example/simple-coffee/example.js", import.meta.url).href,
-		mapUrl: new URL("../example/simple-coffee/example.map", import.meta.url).href,
-		originalUrl: new URL("../example/simple-coffee/example", import.meta.url).href,
+		jsUrl: "/example/simple-coffee/example.js",
+		mapUrl: "/example/simple-coffee/example.map",
+		originalUrl: "/example/simple-coffee/example",
 	},
 	typescript: {
-		jsUrl: new URL("../example/typescript/example.js", import.meta.url).href,
-		mapUrl: new URL("../example/typescript/example.map", import.meta.url).href,
-		originalUrl: new URL("../example/typescript/example", import.meta.url).href,
+		jsUrl: "/example/typescript/example.js",
+		mapUrl: "/example/typescript/example.map",
+		originalUrl: "/example/typescript/example",
 	},
 	babel: {
-		jsUrl: new URL("../example/babel/example.js", import.meta.url).href,
-		mapUrl: new URL("../example/babel/example.map", import.meta.url).href,
-		originalUrl: new URL("../example/babel/example", import.meta.url).href,
+		jsUrl: "/example/babel/example.js",
+		mapUrl: "/example/babel/example.map",
+		originalUrl: "/example/babel/example",
 	},
 	sass: {
-		jsUrl: new URL("../example/sass/example.js", import.meta.url).href,
-		mapUrl: new URL("../example/sass/example.map", import.meta.url).href,
-		originalUrl: new URL("../example/sass/example", import.meta.url).href,
+		jsUrl: "/example/sass/example.js",
+		mapUrl: "/example/sass/example.map",
+		originalUrl: "/example/sass/example",
 	},
 };
 
