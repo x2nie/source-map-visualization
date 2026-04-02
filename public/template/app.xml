@@ -1,0 +1,129 @@
+<templates xml:space="preserve">
+  <t t-name="source-map-visualization.CodeBlock">
+    <section t-att-class="props.block.className">
+      <h3><t t-esc="props.block.title"/></h3>
+      <pre>
+        <code><table><tbody>
+        <tr t-foreach="props.block.rows" t-as="row" t-key="row.key">
+          <td>
+            <t t-if="row.kind === 'sourceHeader'">
+              <h4 class="source-header"><t t-esc="row.text"/></h4>
+            </t>
+            <t t-else="">
+              <t t-foreach="row.segments" t-as="segment" t-key="segment.key">
+                <t t-if="segment.className || segment.mappingKey">
+                  <span
+                    t-att-class="getSegmentClass(segment)"
+                    t-att-title="segment.title || undefined"
+                    t-att-data-mapping-key="segment.mappingKey || undefined"
+                    t-on-mouseenter="onSegmentHover"
+                    t-on-click="onSegmentClick"
+                  ><t t-esc="segment.text"/></span>
+                </t>
+                <t t-else="" t-esc="segment.text"/>
+              </t>
+            </t>
+          </td>
+        </tr>
+      </tbody></table></code></pre>
+    </section>
+  </t>
+
+  <t t-name="source-map-visualization.App">
+    <div class="full-screen app-shell" t-ref="root">
+      <header class="app-header">
+        <div class="header-title">
+          <h1>source-map-visualization</h1>
+          <p class="header-actions">
+            <a
+              t-foreach="exampleKinds"
+              t-as="kind"
+              t-key="kind"
+              t-att-href="'#' + kind"
+              t-att-class="'btn example' + (state.currentHash === kind ? ' active' : '')"
+            ><t t-esc="kind"/></a>
+            <a class="btn btn-primary custom" href="#custom-choose">custom...</a>
+            <a t-if="state.customLink" class="custom-link" t-att-href="state.customLink">Link to this</a>
+            <button class="btn btn-info js-minify" t-att-disabled="!state.currentExample" t-on-click="onMinify">minify generated</button>
+          </p>
+        </div>
+        <small>made with ♡ by sokra &amp; paulirish. <a href="https://github.com/sokra/source-map-visualization/">repo</a></small>
+      </header>
+
+      <main>
+        <div t-if="state.pageError" class="page-error"><t t-esc="state.pageError"/></div>
+        <t t-if="state.visualization">
+          <CodeBlock
+            t-foreach="state.visualization.files"
+            t-as="block"
+            t-key="block.key"
+            block="block"
+            selectedKey="state.selectedMappingKey"
+            onHover.bind="handleItemHover"
+            onActivate.bind="handleItemActivate"
+          />
+        </t>
+        <div t-else="" class="page-empty">Choose an example or load your own SourceMap bundle.</div>
+      </main>
+
+      <footer>
+        <t t-if="state.visualization">
+          <CodeBlock
+            block="state.visualization.mappings"
+            selectedKey="state.selectedMappingKey"
+            onHover.bind="handleItemHover"
+            onActivate.bind="handleItemActivate"
+          />
+        </t>
+      </footer>
+
+      <div t-if="state.custom.visible" class="modal-overlay" t-on-click.self="onCloseCustomModal">
+        <section class="modal-card">
+          <div class="modal-header">
+            <h3>Custom SourceMap</h3>
+            <button class="modal-close" t-on-click="onCloseCustomModal" type="button">×</button>
+          </div>
+          <div class="modal-body">
+            <t t-if="state.custom.step === 'drag'">
+              <h4>Drag'n'Drop</h4>
+              <p>Drop all files anywhere to load them.</p>
+              <p>The SourceMap must have the extension ".map", though ".json" is acceptable if it's the only JSON file.</p>
+            </t>
+            <t t-if="state.custom.step === 'step1'">
+              <div class="alert alert-info">Note: You can drag 'n drop your generated/map files onto the app.</div>
+              <h4>Step 1</h4>
+              <p>Provide generated code file:</p>
+              <div class="modal-actions">
+                <input class="input file-input" type="file" t-on-change="onCustomFileSelected"/>
+                <button class="btn btn-primary" type="button" t-att-disabled="!state.custom.hasPendingFile" t-on-click="onCustomContinue">Load</button>
+              </div>
+            </t>
+            <t t-if="state.custom.step === 'step2'">
+              <h4>Step 1</h4>
+              <p>Generated code provided. (size=<t t-esc="state.custom.generatedSource.length"/>)</p>
+              <h4>Step 2</h4>
+              <p>Provide SourceMap file:</p>
+              <div class="modal-actions">
+                <input class="input file-input" type="file" t-on-change="onCustomFileSelected"/>
+                <button class="btn btn-primary" type="button" t-att-disabled="!state.custom.hasPendingFile" t-on-click="onCustomContinue">Load</button>
+              </div>
+            </t>
+            <t t-if="state.custom.step === 'step3'">
+              <h4>Step 1</h4>
+              <p>Generated code provided. (size=<t t-esc="state.custom.generatedSource.length"/>)</p>
+              <h4>Step 2</h4>
+              <p>SourceMap provided. (mappingsSize=<t t-esc="state.custom.sourceMap.mappings.length"/>)</p>
+              <h4>Step 3</h4>
+              <p>Provide original source file "<t t-esc="state.custom.sourceFile"/>":</p>
+              <div class="modal-actions">
+                <input class="input file-input" type="file" t-on-change="onCustomFileSelected"/>
+                <button class="btn btn-primary" type="button" t-att-disabled="!state.custom.hasPendingFile" t-on-click="onCustomContinue">Load</button>
+              </div>
+            </t>
+          </div>
+          <div t-if="state.custom.error" class="alert alert-error"><t t-esc="state.custom.error"/></div>
+        </section>
+      </div>
+    </div>
+  </t>
+</templates>

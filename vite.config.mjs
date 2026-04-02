@@ -40,8 +40,11 @@ function uglifyBrowserPlugin() {
 
 			return [
 				'import * as SourceMapLibrary from "source-map";',
+				"const exports = {};",
+				"const module = { exports };",
 				'const require = (id) => {',
 				'  if (id === "source-map") return SourceMapLibrary;',
+				'  if (id === "module") return module;',
 				'  throw new Error("Unsupported browser require: " + id);',
 				"};",
 				files.join("\n\n"),
